@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Archive | Discovery Master Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@200;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        :root { 
+            --bg: #ffffff; --text: #1a1c20; --gold: #c5a35d; --danger: #ff4d4d;
+            --shadow: 0 30px 60px rgba(0,0,0,0.06); --skeleton: #f5f5f5;
+            --transition: all 0.6s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+        body { font-family: 'Prompt', sans-serif; background: var(--bg); color: var(--text); margin: 0; overflow-x: hidden; }
+
+        header { padding: 60px 20px 40px; text-align: center; position: relative; }
+        header h1 { font-weight: 200; font-size: 2.8rem; letter-spacing: 10px; margin: 0; text-transform: uppercase; }
+        
+        .admin-trigger { position: absolute; top: 30px; right: 30px; font-size: 11px; padding: 10px 25px; border: 1px solid var(--text); border-radius: 50px; cursor: pointer; text-transform: uppercase; z-index: 1000; transition: 0.3s; background: #fff; }
+        .admin-trigger:hover { background: var(--text); color: #fff; }
+
+        /* --- Filter Bar --- */
+        .filter-section { max-width: 800px; margin: 0 auto 50px; padding: 0 20px; }
+        .search-box { width: 100%; padding: 15px 25px; border-radius: 50px; border: 1px solid #eee; font-family: 'Prompt'; font-size: 1rem; outline: none; transition: 0.3s; box-shadow: 0 5px 15px rgba(0,0,0,0.02); text-align: center; box-sizing: border-box; }
+        .search-box:focus { border-color: var(--gold); box-shadow: 0 10px 25px rgba(197, 163, 93, 0.1); }
+        
+        .category-chips { display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .chip { padding: 6px 18px; border-radius: 50px; font-size: 12px; cursor: pointer; border: 1px solid #eee; transition: 0.3s; color: #888; }
+        .chip.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+        /* --- Book UI & Hover (Full Image) --- */
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 40px 100px; text-align: center; }
+        .shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 60px 40px; }
+        .book-item { display: flex; flex-direction: column; align-items: center; opacity: 0; transition: var(--transition); }
+        .book-item.loaded { animation: fadeIn 1s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .book-wrapper { position: relative; width: 180px; height: 260px; cursor: pointer; perspective: 1000px; transition: var(--transition); }
+        .book-cover { width: 100%; height: 100%; background: #f5f5f5; border-radius: 4px 12px 12px 4px; box-shadow: 10px 15px 30px rgba(0,0,0,0.08); overflow: hidden; border-left: 1px solid rgba(0,0,0,0.05); transition: var(--transition); transform-origin: left; }
+        .book-cover img { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block; }
+        
+        .book-item:not(.admin-mode) .book-wrapper:hover { transform: translateY(-15px); }
+        .book-item:not(.admin-mode) .book-wrapper:hover .book-cover { transform: rotateY(-25deg) scale(1.05); box-shadow: 25px 35px 60px rgba(0,0,0,0.15); }
+        .book-title { margin-top: 25px; font-weight: 400; font-size: 0.9rem; color: #333; }
+        .book-cat-tag { font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; opacity: 0.7; }
+
+        /* --- Admin UI & Unlock Button Feedback --- */
+        #adminPanel { display: none; background: #fff; max-width: 450px; margin: 0 auto 40px; padding: 40px; border-radius: 25px; box-shadow: var(--shadow); flex-direction: column; gap: 15px; border: 1px solid #f0f0f0; }
+        #adminPanel input { border: none; border-bottom: 1px solid #eee; padding: 12px; outline: none; font-family: 'Prompt'; }
+
+        #loginOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.98); z-index: 5000; justify-content: center; align-items: center; flex-direction: column; }
+        .pass-field { position: relative; display: flex; align-items: center; border-bottom: 2px solid #eee; margin-bottom: 30px; width: 250px; }
+        #passInput { border: none; padding: 15px; width: 100%; text-align: center; font-size: 20px; outline: none; font-family: 'Prompt'; background: transparent; }
+        .eye-icon { cursor: pointer; color: #ccc; padding: 10px; transition: 0.3s; }
+        .eye-icon:hover { color: var(--gold); }
+
+        #unlockBtn { 
+            background: var(--text); color: #fff; border: none; padding: 14px 50px; border-radius: 50px; 
+            cursor: pointer; font-family: 'Prompt'; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        #unlockBtn:hover { background: var(--gold); transform: scale(1.08) translateY(-3px); box-shadow: 0 15px 30px rgba(197, 163, 93, 0.3); }
+        #unlockBtn:active { transform: scale(0.95); box-shadow: 0 5px 10px rgba(0,0,0,0.1); }
+
+        .btn-logout { background: none !important; border: 1px solid #ccc !important; color: #888 !important; padding: 8px 25px !important; border-radius: 50px !important; cursor: pointer !important; font-size: 10px !important; margin-top: 20px !important; transition: 0.3s; text-transform: uppercase; display: inline-block; align-self: center; }
+        .btn-logout:hover { border-color: var(--danger) !important; color: var(--danger) !important; background: rgba(255, 77, 77, 0.05) !important; transform: translateY(-2px); }
+
+        .btn-edit { color: var(--gold); border: 1px solid var(--gold); background: none; padding: 3px 12px; border-radius: 20px; cursor: pointer; font-size: 10px; margin: 5px; }
+        .btn-remove { color: var(--danger); border: 1px solid var(--danger); background: none; padding: 3px 12px; border-radius: 20px; cursor: pointer; font-size: 10px; margin: 5px; }
+        
+        #saveOrderBtn { display: none; background: var(--gold); color: white; border: none; padding: 12px 30px; border-radius: 50px; cursor: pointer; margin: 0 auto 20px; font-weight: 600; transition: 0.3s; }
+
+        /* --- Skeleton & Modal --- */
+        .skeleton-item { display: flex; flex-direction: column; align-items: center; }
+        .skeleton-cover { width: 180px; height: 260px; border-radius: 4px 12px 12px 4px; background: linear-gradient(to right, var(--skeleton) 8%, #e8e8e8 18%, var(--skeleton) 33%); background-size: 800px 100%; animation: shimmer 2s infinite linear; }
+        
+        #readerModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; flex-direction: column; }
+        iframe { border: none; flex-grow: 1; width: 100%; }
+        footer { padding: 80px; text-align: center; font-size: 10px; color: #ccc; letter-spacing: 5px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+<div class="admin-trigger" onclick="showLogin()">Management</div>
+
+<header>
+    <h1>The Archive</h1>
+    <p style="color:var(--gold); letter-spacing:4px; font-size:0.75rem;">Elegant Digital Library</p>
+</header>
+
+<div class="filter-section">
+    <input type="text" id="searchInput" class="search-box" placeholder="Search by title..." oninput="filterBooks()">
+    <div id="categoryChips" class="category-chips"></div>
+</div>
+
+<div id="loginOverlay">
+    <h2 style="font-weight:200; letter-spacing:4px; margin-bottom: 40px;">PRIVATE ACCESS</h2>
+    <div class="pass-field">
+        <input type="password" id="passInput" placeholder="Password">
+        <span class="eye-icon" onclick="togglePass()">👁️</span>
+    </div>
+    <button onclick="checkLogin()" id="unlockBtn">UNLOCK</button>
+    <div onclick="hideLogin()" style="margin-top:20px; cursor:pointer; color:#ccc; font-size:11px;">CANCEL</div>
+</div>
+
+<div class="container">
+    <div id="adminPanel">
+        <h2 id="panelTitle" style="font-weight:200; color:var(--gold); margin:0;">NEW ENTRY</h2>
+        <input type="text" id="titleInput" placeholder="Title">
+        <input type="text" id="pdfInput" placeholder="Google Drive Link">
+        <input type="text" id="catInput" placeholder="Category">
+        <input type="file" id="coverInput" accept="image/*">
+        <button onclick="saveEntry()" id="saveBtn" style="background:#1a1c20; color:white; border:none; padding:15px; border-radius:12px; font-weight:600; cursor:pointer; margin-top:10px;">SYNC TO CLOUD</button>
+        <button onclick="resetForm()" id="cancelEdit" style="display:none; background:none; border:none; color:gray; cursor:pointer; font-size:11px;">Cancel Edit</button>
+        <button class="btn-logout" onclick="safeLogout()">Logout Session</button>
+    </div>
+
+    <button id="saveOrderBtn" onclick="saveNewOrder()">✓ SAVE NEW ORDER</button>
+    <div id="bookshelf" class="shelf-grid">
+        <div class="skeleton-item"><div class="skeleton-cover"></div></div>
+        <div class="skeleton-item"><div class="skeleton-cover"></div></div>
+    </div>
+</div>
+
+<div id="readerModal">
+    <div style="padding:15px 30px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f5f5f5;">
+        <span id="readingTitle" style="color:var(--gold); font-size:0.8rem; font-weight:600;"></span>
+        <div>
+            <a id="downloadLink" href="#" target="_blank" style="padding:8px 20px; border-radius:50px; font-size:11px; font-weight:600; text-decoration:none; background:#f4f4f4; color:#1a1c20; border:1px solid #eee; margin-right:10px;">DOWNLOAD</a>
+            <button onclick="closeReader()" style="background:#1a1c20; color:white; border:none; padding:8px 25px; border-radius:50px; cursor:pointer; font-size:11px;">CLOSE</button>
+        </div>
+    </div>
+    <iframe id="pdfFrame" src=""></iframe>
+</div>
+
+<footer>&copy; MMXXVI Private Library Collective</footer>
+
+<script>
+    // ==========================================
+    // 1. วาง URL Web App ของคุณที่นี่
+    // ==========================================
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbxLcMv7RaEV071oO9xHJ24736O6Nmsv9EdNdIdSNBsDoZj42Pa7s6fTiqYODUTHHMOD/exec'; 
+    // ==========================================
+
+    let books = [], isAdmin = false, currentPassword = "", editIndex = null, activeCategory = "All", sortable = null;
+
+    function togglePass() {
+        const x = document.getElementById("passInput");
+        x.type = (x.type === "password") ? "text" : "password";
+    }
+
+    async function loadData() {
+        try { 
+            const res = await fetch(scriptURL); 
+            books = await res.json(); 
+            updateCategoryChips();
+            render(); 
+        } catch(e) { document.getElementById('bookshelf').innerHTML = 'OFFLINE'; }
+    }
+
+    function updateCategoryChips() {
+        const chipContainer = document.getElementById('categoryChips');
+        const categories = ["All", ...new Set(books.map(b => b[3] || "Uncategorized"))];
+        chipContainer.innerHTML = categories.map(cat => `
+            <div class="chip ${cat === activeCategory ? 'active' : ''}" onclick="setCategory('${cat}')">${cat}</div>
+        `).join('');
+    }
+
+    function setCategory(cat) { activeCategory = cat; updateCategoryChips(); filterBooks(); }
+
+    function filterBooks() {
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        const filtered = books.filter(b => {
+            const mSearch = b[0].toLowerCase().includes(term);
+            const mCat = activeCategory === "All" || (b[3] || "Uncategorized") === activeCategory;
+            return mSearch && mCat;
+        });
+        render(filtered);
+    }
+
+    function render(dataToRender = books) {
+        const shelf = document.getElementById('bookshelf'); shelf.innerHTML = '';
+        dataToRender.forEach((b, i) => {
+            const realIndex = books.findIndex(orig => orig[0] === b[0] && orig[1] === b[1]);
+            const item = document.createElement('div');
+            item.className = `book-item loaded ${isAdmin ? 'admin-mode' : ''}`;
+            item.innerHTML = `
+                <div class="book-wrapper" onclick="${isAdmin ? '' : `openReader('${b[1]}', '${b[0]}')`}">
+                    <div class="book-cover"><img src="${b[2]}" onerror="this.src='https://via.placeholder.com/200x300?text=Syncing'"></div>
+                </div>
+                <div class="book-title">${b[0]}</div>
+                <div class="book-cat-tag">${b[3] || 'General'}</div>
+                ${isAdmin ? `<div><button class="btn-edit" onclick="editBook(${realIndex})">EDIT</button><button class="btn-remove" onclick="deleteBook(${realIndex})">REMOVE</button></div>` : ''}
+            `;
+            shelf.appendChild(item);
+        });
+        if (isAdmin) {
+            if(sortable) sortable.destroy();
+            sortable = new Sortable(shelf, { animation: 200 });
+        }
+    }
+
+    async function resizeImg(file) {
+        return new Promise(res => {
+            const reader = new FileReader(); reader.readAsDataURL(file);
+            reader.onload = e => {
+                const img = new Image(); img.src = e.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                    canvas.width = 360; canvas.height = 520;
+                    const ratio = Math.max(canvas.width / img.width, canvas.height / img.height);
+                    ctx.drawImage(img, (canvas.width - img.width * ratio) / 2, (canvas.height - img.height * ratio) / 2, img.width * ratio, img.height * ratio);
+                    res(canvas.toDataURL('image/jpeg', 0.7));
+                }
+            }
+        });
+    }
+
+    async function saveEntry() {
+        const btn = document.getElementById('saveBtn'); btn.innerText = "SYNCING..."; btn.disabled = true;
+        const title = document.getElementById('titleInput').value, url = document.getElementById('pdfInput').value, 
+              cat = document.getElementById('catInput').value, file = document.getElementById('coverInput').files[0];
+        const match = url.match(/\/d\/([^\/]+)/);
+        if(!title || !match) { alert("Invalid Data"); btn.disabled = false; return; }
+
+        let cover = (editIndex !== null) ? books[editIndex][2] : `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+        if(file) cover = await resizeImg(file);
+
+        const payload = { 
+            action: (editIndex !== null) ? 'edit' : 'add', 
+            title, pdfUrl: `https://drive.google.com/file/d/${match[1]}/preview`, 
+            coverData: cover, category: cat || "General", password: currentPassword, index: editIndex 
+        };
+        await fetch(scriptURL, { method: 'POST', body: JSON.stringify(payload) });
+        resetForm(); await loadData(); btn.disabled = false; btn.innerText = "SYNC TO CLOUD";
+    }
+
+    function editBook(i) {
+        editIndex = i; document.getElementById('panelTitle').innerText = "EDIT MODE";
+        document.getElementById('saveBtn').innerText = "UPDATE DATA";
+        document.getElementById('cancelEdit').style.display = "inline";
+        document.getElementById('titleInput').value = books[i][0];
+        document.getElementById('pdfInput').value = books[i][1];
+        document.getElementById('catInput').value = books[i][3] || "";
+        document.getElementById('adminPanel').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function resetForm() {
+        editIndex = null; document.getElementById('panelTitle').innerText = "NEW ENTRY";
+        document.getElementById('saveBtn').innerText = "SYNC TO CLOUD";
+        document.getElementById('cancelEdit').style.display = "none";
+        document.getElementById('titleInput').value = ''; document.getElementById('pdfInput').value = ''; 
+        document.getElementById('catInput').value = ''; document.getElementById('coverInput').value = '';
+    }
+
+    function safeLogout() {
+        isAdmin = false; currentPassword = ""; editIndex = null;
+        document.getElementById('adminPanel').style.display = 'none';
+        // --- แก้ไขจุดนี้: ซ่อนปุ่ม Save New Order ทันที ---
+        document.getElementById('saveOrderBtn').style.display = 'none'; 
+        if(sortable){ sortable.destroy(); sortable = null; }
+        render();
+    }
+
+    function showLogin() { document.getElementById('loginOverlay').style.display = 'flex'; }
+    function hideLogin() { document.getElementById('loginOverlay').style.display = 'none'; }
+    async function checkLogin() {
+        const pass = document.getElementById('passInput').value;
+        const res = await fetch(scriptURL, { method: 'POST', body: JSON.stringify({ action: 'check', password: pass }) });
+        const result = await res.json();
+        if (result.status === "Success") {
+            isAdmin = true; currentPassword = pass;
+            hideLogin(); document.getElementById('adminPanel').style.display = 'flex';
+            document.getElementById('saveOrderBtn').style.display = 'block'; // เปลี่ยนเป็น block เพื่อให้อยู่ตรงกลาง
+            render();
+        } else { alert("Incorrect Password"); }
+    }
+
+    async function deleteBook(i) { if(confirm("Remove?")) { await fetch(scriptURL, { method: 'POST', body: JSON.stringify({action: 'delete', index: i, password: currentPassword}) }); await loadData(); } }
+    async function saveNewOrder() {
+        const btn = document.getElementById('saveOrderBtn'); btn.innerText = "SAVING...";
+        const newList = Array.from(document.querySelectorAll('.book-item')).map(it => {
+            const t = it.querySelector('.book-title').innerText;
+            return books.find(b => b[0] === t);
+        });
+        await fetch(scriptURL, { method: 'POST', body: JSON.stringify({ action: 'updateOrder', newList, password: currentPassword }) });
+        await loadData(); btn.innerText = "✓ SAVE NEW ORDER";
+    }
+
+    function openReader(url, title) {
+        const id = url.match(/\/d\/([^\/]+)/)[1];
+        document.getElementById('downloadLink').href = `https://drive.google.com/uc?export=download&id=${id}`;
+        document.getElementById('pdfFrame').src = url; document.getElementById('readingTitle').innerText = title;
+        document.getElementById('readerModal').style.display = 'flex';
+    }
+    function closeReader() { document.getElementById('pdfFrame').src = ""; document.getElementById('readerModal').style.display = 'none'; }
+    
+    loadData();
+</script>
+</body>
+</html>
